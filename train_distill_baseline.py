@@ -47,10 +47,8 @@ TEACHER_LR      = 5e-5
 TEACHER_BATCH   = 128
 
 # ---- Distillation ----
-DISTILL_TEMP_START  = 8.0    # initial temperature (early training: soft targets)
-DISTILL_TEMP_END    = 2.0    # final temperature (late training: crisp targets)
-DISTILL_ALPHA_START = 0.5    # initial alpha (early: 50% hard, 50% soft)
-DISTILL_ALPHA_END   = 0.05   # final alpha (late: 95% soft, 5% hard)
+DISTILL_TEMP    = 4.0    # temperature — softens teacher distribution
+DISTILL_ALPHA   = 0.1   # weight on hard CE loss  (1-alpha on soft KL loss)
 
 # ---- Student (mirrors baseline) ----
 MODEL_NAME        = "mamba_cnn_distill"
@@ -257,35 +255,18 @@ class SAM:
 
 
 # ============================================
-# DISTILLATION SCHEDULING & LOSS
+# DISTILLATION LOSS
 # ============================================
-
-def get_distill_schedule(epoch, total_epochs):
-    """Schedule temperature and alpha over training epochs (curriculum learning)."""
-    progress = (epoch - 1) / (total_epochs - 1)  # 0 to 1
-
-    # Linear decay: high→low for temp, high→low for alpha
-    temp = DISTILL_TEMP_START - (DISTILL_TEMP_START - DISTILL_TEMP_END) * progress
-    alpha = DISTILL_ALPHA_START - (DISTILL_ALPHA_START - DISTILL_ALPHA_END) * progress
-
-    return temp, alpha
-
 
 def distill_loss(s_logits, t_logits, labels, temp=4.0, alpha=0.1):
     """
-    Distillation loss with curriculum scheduling:
-    loss = alpha * CE(student, hard_labels) + (1-alpha) * T² * KL(student_soft || teacher_soft)
-
-    Note: label_smoothing removed from hard loss to avoid double-smoothing with soft targets
+    alpha  * CE(student, hard_labels)
+    (1-alpha) * T² * KL(student_soft || teacher_soft)
     """
-    # Hard CE loss (without label smoothing - soft targets provide smoothing)
-    hard = F.cross_entropy(s_logits, labels)
-
-    # Soft KL divergence loss
+    hard = F.cross_entropy(s_logits, labels, label_smoothing=LABEL_SMOOTHING)
     s_soft = F.log_softmax(s_logits / temp, dim=-1)
-    t_soft = F.softmax(t_logits / temp, dim=-1)
+    t_soft = F.softmax(t_logits  / temp, dim=-1)
     soft = F.kl_div(s_soft, t_soft, reduction="batchmean") * (temp ** 2)
-
     return alpha * hard + (1 - alpha) * soft
 
 
@@ -481,9 +462,6 @@ def train_student(device, run_dir, rank, world_size):
         student.train()
         tr_loss = tr_correct = tr_total = 0
 
-        # Get scheduled temperature and alpha for curriculum learning
-        distill_temp, distill_alpha = get_distill_schedule(epoch, EPOCHS)
-
         pbar = tqdm(train_loader, desc=f"Epoch {epoch:>3} Train", leave=False,
                     disable=not is_main, dynamic_ncols=True, colour="cyan")
         for imgs, labels in pbar:
@@ -497,7 +475,7 @@ def train_student(device, run_dir, rank, world_size):
 
             def step(sync=True):
                 s_logits = student(imgs)
-                loss     = distill_loss(s_logits, t_logits, labels, distill_temp, distill_alpha)
+                loss     = distill_loss(s_logits, t_logits, labels, DISTILL_TEMP, DISTILL_ALPHA)
                 loss.backward()
                 return s_logits, loss
 
@@ -553,7 +531,7 @@ def train_student(device, run_dir, rank, world_size):
             history["test_acc"].append(te_acc)
 
             if epoch % 10 == 0 or epoch == start_epoch:
-                print(f"  Epoch {epoch:>3}: Train Acc={tr_acc:.4f}, Test Acc={te_acc:.4f} | Temp={distill_temp:.2f}, Alpha={distill_alpha:.3f}")
+                print(f"  Epoch {epoch:>3}: Train Acc={tr_acc:.4f}, Test Acc={te_acc:.4f}")
 
 
             if te_loss < best_test_loss:
@@ -616,9 +594,7 @@ def main():
         print(f"  World size (GPUs): {world_size}")
         print(f"  Teacher : {TEACHER_MODEL} (fine-tuned on CIFAR-10)")
         print(f"  Student : MambaCNN  D={D_MODEL}, N={N_MAMBA}, Ds={D_STATE}")
-        print(f"  Distillation Schedule (Curriculum Learning):")
-        print(f"    Temperature: {DISTILL_TEMP_START:.1f} → {DISTILL_TEMP_END:.1f}")
-        print(f"    Alpha:       {DISTILL_ALPHA_START:.2f} → {DISTILL_ALPHA_END:.3f}")
+        print(f"  Temp={DISTILL_TEMP}, Alpha={DISTILL_ALPHA}")
         print(f"{'#'*60}")
 
     # ---- Phase 1: Teacher fine-tuning (rank 0 only, skipped if ckpt exists) ----

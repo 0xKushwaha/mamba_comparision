@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 """
-Knowledge Distillation: ViT-B/16 Teacher → MambaCNN Student
-Launch: torchrun --nproc_per_node=NUM_GPUS train_distill.py
+Knowledge Distillation v2: ViT-B/16 Teacher → MambaCNNv2 Student
+Improvement over v1: Inter-stage skip connections (cross-stage residuals)
 
-Phase 1 (auto, rank-0 only): Fine-tune ViT-B/16 on CIFAR-10 as teacher (~99% acc)
-Phase 2: Train MambaCNN student with soft labels from frozen teacher
+Architecture change:
+  - stage1 output → projected → added to down1 output (skip connection 1)
+  - stage2 output → projected → added to down2 output (skip connection 2)
+
+Training nuances preserved:
+  - Multi-GPU training via DDP (torchrun)
+  - SAM optimizer (Sharpness-Aware Minimization)
+  - EMA (Exponential Moving Average) for best checkpoint
+  - Curriculum distillation: temperature and alpha scheduled over epochs
+  - Warmup + Cosine Annealing LR scheduler
+  - Fully resumable (checkpoint every epoch)
+  - Teacher fine-tuned once, reused across experiments
+
+Launch: torchrun --nproc_per_node=NUM_GPUS train_distill_v2.py
 """
 
 import os
@@ -34,26 +46,27 @@ import seaborn as sns
 
 warnings.filterwarnings("ignore")
 
+
 # ============================================
 # CONFIGURATION
 # ============================================
 
-# ---- Teacher ----
-TEACHER_MODEL   = "vit_base_patch16_224"   # timm model; pretrained=True → ImageNet weights
-TEACHER_SIZE    = 224                       # ViT requires 224×224
-TEACHER_CKPT    = "outputs_distill/teacher_vit.pth"
+# ---- Teacher (reuse from v1 if available) ----
+TEACHER_MODEL   = "vit_base_patch16_224"
+TEACHER_SIZE    = 224
+TEACHER_CKPT    = "outputs_distill/teacher_vit.pth"     # reuse v1 teacher
 TEACHER_EPOCHS  = 50
 TEACHER_LR      = 5e-5
 TEACHER_BATCH   = 128
 
-# ---- Distillation ----
-DISTILL_TEMP_START  = 8.0    # initial temperature (early training: soft targets)
-DISTILL_TEMP_END    = 2.0    # final temperature (late training: crisp targets)
-DISTILL_ALPHA_START = 0.5    # initial alpha (early: 50% hard, 50% soft)
-DISTILL_ALPHA_END   = 0.05   # final alpha (late: 95% soft, 5% hard)
+# ---- Distillation (same curriculum schedule as v1) ----
+DISTILL_TEMP_START  = 8.0
+DISTILL_TEMP_END    = 2.0
+DISTILL_ALPHA_START = 0.5
+DISTILL_ALPHA_END   = 0.05
 
-# ---- Student (mirrors baseline) ----
-MODEL_NAME        = "mamba_cnn_distill"
+# ---- Student ----
+MODEL_NAME        = "mamba_cnn_v2_distill"
 DATASET_PATH      = "/home/user2/Documents/classification/cifar10"
 IMAGE_SIZE        = 32
 BATCH_SIZE        = 256
@@ -70,11 +83,11 @@ D_STATE           = 8
 EMA_DECAY         = 0.9999
 DROP_PATH_MAX     = 0.1
 
-OUTPUT_DIR        = "outputs_distill"
+OUTPUT_DIR        = "outputs_distill_v2"
 
 
 # ============================================
-# STUDENT MODEL  (identical to train_mamba.py)
+# STUDENT MODEL v2 — Inter-stage skip connections
 # ============================================
 
 class SEBlock(nn.Module):
@@ -168,29 +181,84 @@ def _morton_order(h, w):
     return torch.argsort(torch.tensor(codes))
 
 
-class MambaCNN(nn.Module):
+class MambaCNNv2(nn.Module):
+    """
+    MambaCNN with inter-stage skip connections.
+
+    Architecture:
+        entry → stage1 ──────────────────────skip1──────┐
+                  ↓                                      ↓
+               down1 ─────────────────────────────────(+)→ stage2 ──────skip2──┐
+                                                                     ↓           ↓
+                                                                  down2 ───────(+)
+                                                                     ↓
+                                                               flatten → Mamba → head
+
+    skip1: stage1 (32ch, 32×32) → Conv1×1(32→64) + BN + MaxPool → (64ch, 16×16)
+           added to down1 output before stage2
+
+    skip2: stage2 (64ch, 16×16) → Conv1×1(64→d_model) + BN + MaxPool → (d_model, 8×8)
+           added to down2 output before Mamba
+
+    Extra params: ~8K (negligible vs 243K total)
+    """
     def __init__(self, num_classes, d_model=96, n_mamba=3, d_state=8, drop_path_max=0.1, img_size=32):
         super().__init__()
-        self.entry  = nn.Sequential(nn.Conv2d(3,32,3,padding=1,bias=False), nn.BatchNorm2d(32), nn.GELU())
-        self.stage1 = nn.Sequential(StemBlock(32,32), StemBlock(32,32))
-        self.down1  = nn.Sequential(StemBlock(32,64),  nn.MaxPool2d(2))
-        self.stage2 = nn.Sequential(StemBlock(64,64), StemBlock(64,64))
-        self.down2  = nn.Sequential(StemBlock(64,d_model), nn.MaxPool2d(2))
-        h_out = img_size // 4  # two MaxPool2d(2) reductions
+
+        # ---- Backbone (same as v1) ----
+        self.entry  = nn.Sequential(nn.Conv2d(3, 32, 3, padding=1, bias=False), nn.BatchNorm2d(32), nn.GELU())
+        self.stage1 = nn.Sequential(StemBlock(32, 32), StemBlock(32, 32))
+        self.down1  = nn.Sequential(StemBlock(32, 64), nn.MaxPool2d(2))
+        self.stage2 = nn.Sequential(StemBlock(64, 64), StemBlock(64, 64))
+        self.down2  = nn.Sequential(StemBlock(64, d_model), nn.MaxPool2d(2))
+
+        # ---- NEW: Inter-stage skip connections ----
+        # skip1: stage1 output (32ch, 32×32) → (64ch, 16×16), added to down1 output
+        self.skip1 = nn.Sequential(
+            nn.Conv2d(32, 64, 1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(2)
+        )
+
+        # skip2: stage2 output (64ch, 16×16) → (d_model, 8×8), added to down2 output
+        self.skip2 = nn.Sequential(
+            nn.Conv2d(64, d_model, 1, bias=False),
+            nn.BatchNorm2d(d_model),
+            nn.MaxPool2d(2)
+        )
+
+        # ---- Mamba sequence (same as v1) ----
+        h_out = img_size // 4  # two MaxPool2d(2) reductions → 8×8
         self.pos_embed = nn.Parameter(torch.zeros(1, h_out * h_out, d_model))
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
         self.register_buffer("token_order", _morton_order(h_out, h_out))
-        dp = [drop_path_max * i / max(n_mamba-1, 1) for i in range(n_mamba)]
+        dp = [drop_path_max * i / max(n_mamba - 1, 1) for i in range(n_mamba)]
         self.mamba = nn.Sequential(*[MambaBlock(d_model, d_state, drop_path=dp[i]) for i in range(n_mamba)])
         self.norm  = nn.LayerNorm(d_model)
         self.head  = nn.Sequential(nn.Dropout(0.1), nn.Linear(d_model, num_classes))
 
     def forward(self, x):
-        x = self.entry(x); x = self.stage1(x)
-        x = self.down1(x); x = self.stage2(x); x = self.down2(x)
-        x = x.flatten(2).transpose(1,2)
+        x  = self.entry(x)
+
+        # Stage 1: [B, 32, 32, 32]
+        s1 = self.stage1(x)
+
+        # Down1 + skip1: [B, 64, 16, 16]
+        x  = self.down1(s1) + self.skip1(s1)
+
+        # Stage 2: [B, 64, 16, 16]
+        s2 = self.stage2(x)
+
+        # Down2 + skip2: [B, d_model, 8, 8]
+        x  = self.down2(s2) + self.skip2(s2)
+
+        # Flatten and reorder tokens
+        x = x.flatten(2).transpose(1, 2)          # [B, 64, d_model]
         x = x[:, self.token_order] + self.pos_embed
-        x = self.mamba(x); x = self.norm(x)
+
+        # Mamba blocks
+        x = self.mamba(x)
+        x = self.norm(x)
         return self.head(x.mean(1))
 
 
@@ -204,21 +272,21 @@ class EMA:
         self.shadow = {k: v.clone().float() for k, v in model.state_dict().items()}
     def update(self, model):
         self.num_updates += 1
-        d = min(self.decay, (1+self.num_updates)/(10+self.num_updates))
+        d = min(self.decay, (1 + self.num_updates) / (10 + self.num_updates))
         with torch.no_grad():
             for k, v in model.state_dict().items():
-                self.shadow[k] = d*self.shadow[k] + (1-d)*v.float()
+                self.shadow[k] = d * self.shadow[k] + (1 - d) * v.float()
     def state_dict(self):
         return {"shadow": self.shadow, "num_updates": self.num_updates}
     def load_state_dict(self, state):
         if "shadow" in state:
-            self.shadow = {k: v.float() for k,v in state["shadow"].items()}
+            self.shadow = {k: v.float() for k, v in state["shadow"].items()}
             self.num_updates = state.get("num_updates", 0)
         else:
-            self.shadow = {k: v.float() for k,v in state.items()}
+            self.shadow = {k: v.float() for k, v in state.items()}
     def to_state_dict(self, model):
         dtype = next(model.parameters()).dtype
-        return {k: v.to(dtype) for k,v in self.shadow.items()}
+        return {k: v.to(dtype) for k, v in self.shadow.items()}
 
 
 # ============================================
@@ -261,31 +329,22 @@ class SAM:
 # ============================================
 
 def get_distill_schedule(epoch, total_epochs):
-    """Schedule temperature and alpha over training epochs (curriculum learning)."""
-    progress = (epoch - 1) / (total_epochs - 1)  # 0 to 1
-
-    # Linear decay: high→low for temp, high→low for alpha
-    temp = DISTILL_TEMP_START - (DISTILL_TEMP_START - DISTILL_TEMP_END) * progress
+    """Linear decay schedule for temperature and alpha (curriculum learning)."""
+    progress = (epoch - 1) / (total_epochs - 1)
+    temp  = DISTILL_TEMP_START  - (DISTILL_TEMP_START  - DISTILL_TEMP_END)  * progress
     alpha = DISTILL_ALPHA_START - (DISTILL_ALPHA_START - DISTILL_ALPHA_END) * progress
-
     return temp, alpha
 
 
 def distill_loss(s_logits, t_logits, labels, temp=4.0, alpha=0.1):
     """
-    Distillation loss with curriculum scheduling:
     loss = alpha * CE(student, hard_labels) + (1-alpha) * T² * KL(student_soft || teacher_soft)
-
-    Note: label_smoothing removed from hard loss to avoid double-smoothing with soft targets
+    No label_smoothing on hard loss — soft targets already provide smoothing.
     """
-    # Hard CE loss (without label smoothing - soft targets provide smoothing)
-    hard = F.cross_entropy(s_logits, labels)
-
-    # Soft KL divergence loss
+    hard   = F.cross_entropy(s_logits, labels)
     s_soft = F.log_softmax(s_logits / temp, dim=-1)
     t_soft = F.softmax(t_logits / temp, dim=-1)
-    soft = F.kl_div(s_soft, t_soft, reduction="batchmean") * (temp ** 2)
-
+    soft   = F.kl_div(s_soft, t_soft, reduction="batchmean") * (temp ** 2)
     return alpha * hard + (1 - alpha) * soft
 
 
@@ -351,7 +410,6 @@ def finetune_teacher(device):
     best_acc    = 0.0
     start_epoch = 1
 
-    # Resume teacher if checkpoint exists
     if os.path.exists(TEACHER_RESUME_CKPT):
         ckpt        = torch.load(TEACHER_RESUME_CKPT, map_location=device, weights_only=True)
         teacher.load_state_dict(ckpt["model"])
@@ -368,7 +426,6 @@ def finetune_teacher(device):
     train_loader, test_loader = make_teacher_loaders()
 
     for epoch in range(start_epoch, TEACHER_EPOCHS + 1):
-        # Train
         teacher.train()
         for imgs, labels in tqdm(train_loader, desc=f"[Teacher] Epoch {epoch:>3} Train",
                                  leave=False, dynamic_ncols=True, colour="green"):
@@ -380,7 +437,6 @@ def finetune_teacher(device):
             optimizer.step()
         scheduler.step()
 
-        # Eval
         teacher.eval()
         correct = total = 0
         with torch.no_grad():
@@ -396,9 +452,8 @@ def finetune_teacher(device):
 
         if acc > best_acc:
             best_acc = acc
-            torch.save(teacher.state_dict(), TEACHER_CKPT)   # best weights only
+            torch.save(teacher.state_dict(), TEACHER_CKPT)
 
-        # Resume checkpoint — saves every epoch
         torch.save({
             "epoch":     epoch,
             "model":     teacher.state_dict(),
@@ -431,24 +486,25 @@ def train_student(device, run_dir, rank, world_size):
     if is_main:
         print(f"  [Teacher] Loaded from {TEACHER_CKPT} (frozen)")
 
-    # ---- Student ----
+    # ---- Student (v2 with skip connections) ----
     train_loader, test_loader, class_names, train_sampler = make_student_loaders(rank, world_size)
     num_classes = len(class_names)
 
-    student = MambaCNN(num_classes, D_MODEL, N_MAMBA, D_STATE, DROP_PATH_MAX, IMAGE_SIZE).to(device)
+    student = MambaCNNv2(num_classes, D_MODEL, N_MAMBA, D_STATE, DROP_PATH_MAX, IMAGE_SIZE).to(device)
     student = DDP(student, device_ids=[device.index])
 
     total_p = sum(p.numel() for p in student.parameters())
     if is_main:
-        print(f"  [Student] Params: {total_p:,} ({total_p*4/1024/1024:.2f} MB)")
+        print(f"  [Student v2] Params: {total_p:,} ({total_p*4/1024/1024:.2f} MB)")
+        print(f"  [Skip connections] skip1: 32→64 ch, skip2: 64→{D_MODEL} ch")
 
     base_opt  = torch.optim.AdamW(student.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
     optimizer = SAM(base_opt, rho=SAM_RHO)
 
     actual_warmup = min(WARMUP_EPOCHS, EPOCHS)
     cosine_steps  = max(1, EPOCHS - actual_warmup)
-    warmup   = torch.optim.lr_scheduler.LinearLR(base_opt, 1e-3, 1.0, total_iters=actual_warmup)
-    cosine   = torch.optim.lr_scheduler.CosineAnnealingLR(base_opt, T_max=cosine_steps, eta_min=1e-6)
+    warmup    = torch.optim.lr_scheduler.LinearLR(base_opt, 1e-3, 1.0, total_iters=actual_warmup)
+    cosine    = torch.optim.lr_scheduler.CosineAnnealingLR(base_opt, T_max=cosine_steps, eta_min=1e-6)
     scheduler = torch.optim.lr_scheduler.SequentialLR(base_opt, [warmup, cosine], milestones=[actual_warmup])
 
     ema = EMA(student.module, decay=EMA_DECAY)
@@ -465,8 +521,6 @@ def train_student(device, run_dir, rank, world_size):
         student.module.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
-        # T_max is deterministic from EPOCHS/WARMUP_EPOCHS constants; no patch needed.
-        # If you change EPOCHS between runs, delete the resume checkpoint and start fresh.
         ema.load_state_dict(ckpt["ema"])
         start_epoch    = ckpt["epoch"] + 1
         best_test_loss = ckpt["best_test_loss"]
@@ -475,13 +529,12 @@ def train_student(device, run_dir, rank, world_size):
             print(f"  Resumed at epoch {ckpt['epoch']}, best_test_loss={best_test_loss:.4f}")
     dist.barrier()
 
-
     for epoch in range(start_epoch, EPOCHS + 1):
         train_sampler.set_epoch(epoch)
         student.train()
         tr_loss = tr_correct = tr_total = 0
 
-        # Get scheduled temperature and alpha for curriculum learning
+        # Curriculum learning: schedule temp and alpha
         distill_temp, distill_alpha = get_distill_schedule(epoch, EPOCHS)
 
         pbar = tqdm(train_loader, desc=f"Epoch {epoch:>3} Train", leave=False,
@@ -489,11 +542,10 @@ def train_student(device, run_dir, rank, world_size):
         for imgs, labels in pbar:
             imgs, labels = imgs.to(device), labels.to(device)
 
-            # Teacher sees 224×224 (bilinear upsample from student's 32×32 input)
             with torch.no_grad():
-                imgs_224     = F.interpolate(imgs, (TEACHER_SIZE, TEACHER_SIZE),
-                                             mode="bilinear", align_corners=False)
-                t_logits     = teacher(imgs_224)   # soft targets — no grad
+                imgs_224 = F.interpolate(imgs, (TEACHER_SIZE, TEACHER_SIZE),
+                                         mode="bilinear", align_corners=False)
+                t_logits = teacher(imgs_224)
 
             def step(sync=True):
                 s_logits = student(imgs)
@@ -530,7 +582,7 @@ def train_student(device, run_dir, rank, world_size):
         tr_loss /= tr_total
         tr_acc   = tr_correct / tr_total
 
-        # ---- Test (eval mode, no grad, model never learns from this) ----
+        # ---- Test (eval mode, no grad) ----
         student.eval()
         te_loss = te_correct = te_total = 0
         with torch.no_grad():
@@ -554,7 +606,6 @@ def train_student(device, run_dir, rank, world_size):
 
             if epoch % 10 == 0 or epoch == start_epoch:
                 print(f"  Epoch {epoch:>3}: Train Acc={tr_acc:.4f}, Test Acc={te_acc:.4f} | Temp={distill_temp:.2f}, Alpha={distill_alpha:.3f}")
-
 
             if te_loss < best_test_loss:
                 best_test_loss = te_loss
@@ -612,19 +663,20 @@ def main():
 
     if is_main:
         print(f"\n{'#'*60}")
-        print(f"  KNOWLEDGE DISTILLATION TRAINING")
+        print(f"  KNOWLEDGE DISTILLATION v2 TRAINING")
+        print(f"  Model: MambaCNNv2 (with inter-stage skip connections)")
         print(f"  World size (GPUs): {world_size}")
         print(f"  Teacher : {TEACHER_MODEL} (fine-tuned on CIFAR-10)")
-        print(f"  Student : MambaCNN  D={D_MODEL}, N={N_MAMBA}, Ds={D_STATE}")
+        print(f"  Student : MambaCNNv2  D={D_MODEL}, N={N_MAMBA}, Ds={D_STATE}")
         print(f"  Distillation Schedule (Curriculum Learning):")
         print(f"    Temperature: {DISTILL_TEMP_START:.1f} → {DISTILL_TEMP_END:.1f}")
         print(f"    Alpha:       {DISTILL_ALPHA_START:.2f} → {DISTILL_ALPHA_END:.3f}")
         print(f"{'#'*60}")
 
-    # ---- Phase 1: Teacher fine-tuning (rank 0 only, skipped if ckpt exists) ----
+    # ---- Phase 1: Teacher (reuse v1 checkpoint if available, else train) ----
     if is_main and not os.path.exists(TEACHER_CKPT):
         finetune_teacher(device)
-    dist.barrier()   # all ranks wait until teacher is ready
+    dist.barrier()
 
     # ---- Phase 2: Student distillation ----
     run_dir = os.path.join(OUTPUT_DIR, "run")
@@ -632,16 +684,25 @@ def main():
         final_acc, class_names, total_p = train_student(device, run_dir, rank, world_size)
         if is_main:
             print(f"\n{'='*60}")
-            print(f"  DISTILLATION RESULTS")
+            print(f"  DISTILLATION v2 RESULTS")
             print(f"{'='*60}")
+            print(f"  Model         : MambaCNNv2 (inter-stage skip connections)")
             print(f"  Test Accuracy : {final_acc*100:.2f}%")
             print(f"  Student params: {total_p:,}")
             print(f"  Teacher       : {TEACHER_MODEL}")
             print(f"{'='*60}")
-            summary = {"teacher": TEACHER_MODEL, "test_acc": float(final_acc*100),
-                       "distill_temp": DISTILL_TEMP, "distill_alpha": DISTILL_ALPHA,
-                       "student_params": total_p}
-            with open(os.path.join(OUTPUT_DIR, "distill_summary.json"), "w") as f:
+            summary = {
+                "model": "MambaCNNv2",
+                "teacher": TEACHER_MODEL,
+                "test_acc": float(final_acc * 100),
+                "distill_temp_start": DISTILL_TEMP_START,
+                "distill_temp_end": DISTILL_TEMP_END,
+                "distill_alpha_start": DISTILL_ALPHA_START,
+                "distill_alpha_end": DISTILL_ALPHA_END,
+                "student_params": total_p,
+                "skip_connections": ["stage1→down1", "stage2→down2"],
+            }
+            with open(os.path.join(OUTPUT_DIR, "distill_v2_summary.json"), "w") as f:
                 json.dump(summary, f, indent=2)
     finally:
         dist.destroy_process_group()
@@ -654,7 +715,7 @@ if __name__ == "__main__":
         cmd = [
             sys.executable, "-m", "torch.distributed.run",
             f"--nproc_per_node={nproc}",
-            "--master_port=29501",
+            "--master_port=29502",      # different port from v1 to avoid conflicts
             *sys.argv,
         ]
         subprocess.run(cmd, check=True)
