@@ -262,8 +262,9 @@ def parse_args():
     p.add_argument("--dataset",    required=True,
                    choices=["dtd","stl10","tiny_imagenet"],
                    help="Dataset to train on")
-    p.add_argument("--data_path",  required=True,
-                   help="Path to dataset root directory")
+    _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    p.add_argument("--data_path",  default=_default_data,
+                   help="Path to dataset root (default: ./data/ next to script)")
 
     # Architecture
     p.add_argument("--n_pool",   type=int, default=3,

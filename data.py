@@ -151,11 +151,16 @@ def load_stl10(data_path: str, img_size: int, batch_size: int,
 
     Returns: train_loader, val_loader, test_loader, class_names
     """
-    train_ds_full = datasets.STL10(data_path, split="train", download=True,
+    # torchvision expects root = parent of stl10_binary/
+    # on disk: data/stl10_binary/  → pass data/ as root
+    stl_root = data_path if os.path.isdir(os.path.join(data_path, "stl10_binary")) \
+               else os.path.dirname(data_path)
+
+    train_ds_full = datasets.STL10(stl_root, split="train", download=False,
                                    transform=_train_tf(img_size, "stl10"))
-    eval_ds_full  = datasets.STL10(data_path, split="train", download=True,
+    eval_ds_full  = datasets.STL10(stl_root, split="train", download=False,
                                    transform=_eval_tf(img_size))
-    test_ds       = datasets.STL10(data_path, split="test",  download=True,
+    test_ds       = datasets.STL10(stl_root, split="test",  download=False,
                                    transform=_eval_tf(img_size))
 
     class_names = train_ds_full.classes
@@ -204,8 +209,16 @@ def load_tiny_imagenet(data_path: str, img_size: int, batch_size: int,
     Returns: train_loader, val_loader, test_loader, class_names
     (test_loader = val_loader — Tiny ImageNet has no public test labels)
     """
-    train_path = os.path.join(data_path, "train")
-    val_path   = os.path.join(data_path, "val")
+    # Accept either:
+    #   data_path = .../data                  → appends tiny-imagenet-200/
+    #   data_path = .../data/tiny-imagenet-200 → uses directly
+    if os.path.basename(data_path) == "tiny-imagenet-200":
+        tiny_root = data_path
+    else:
+        tiny_root = os.path.join(data_path, "tiny-imagenet-200")
+
+    train_path = os.path.join(tiny_root, "train")
+    val_path   = os.path.join(tiny_root, "val")
 
     if not os.path.isdir(train_path):
         raise FileNotFoundError(

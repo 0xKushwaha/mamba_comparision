@@ -161,20 +161,23 @@ def run_ablation(args):
     img_size  = DATASET_INFO[dataset]["default_img_size"]
     all_results = []
 
-    total_runs  = len(ALL_MODELS) * len(N_POOL_RANGE)
+    # Support running a single n_pool value (for splitting large jobs)
+    n_pool_range = [args.n_pool_single] if args.n_pool_single else N_POOL_RANGE
+
+    total_runs  = len(ALL_MODELS) * len(n_pool_range)
     run_counter = 0
 
     print(f"\n{'#'*65}")
     print(f"  ABLATION STUDY")
     print(f"  Dataset  : {dataset} ({DATASET_INFO[dataset]['description']})")
     print(f"  Models   : {len(ALL_MODELS)}")
-    print(f"  n_pool   : {N_POOL_RANGE}")
+    print(f"  n_pool   : {n_pool_range}")
     print(f"  Seeds    : {args.seeds}")
     print(f"  Total    : {total_runs} experiments × {len(args.seeds)} seeds each")
     print(f"  Output   : {output_dir}")
     print(f"{'#'*65}\n")
 
-    for n_pool in N_POOL_RANGE:
+    for n_pool in n_pool_range:
         for model_type in ALL_MODELS:
             run_counter += 1
             run_dir = os.path.join(output_dir, f"{model_type}_np{n_pool}")
@@ -261,7 +264,8 @@ def parse_ablation_args():
     # Required
     p.add_argument("--dataset",   required=True,
                    choices=["dtd","stl10","tiny_imagenet"])
-    p.add_argument("--data_path", required=True)
+    _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    p.add_argument("--data_path", default=_default_data)
 
     # Architecture (shared across all runs)
     p.add_argument("--d_model",  type=int, default=64)
@@ -286,6 +290,9 @@ def parse_ablation_args():
     p.add_argument("--output_dir",    default="outputs")
     p.add_argument("--skip_existing", action="store_true",
                    help="Skip experiments whose summary.json already exists (resume)")
+    p.add_argument("--n_pool_single", type=int, default=None,
+                   choices=[2, 3, 4],
+                   help="Run only one n_pool value (for splitting large jobs across PBS submissions)")
 
     return p.parse_args()
 
