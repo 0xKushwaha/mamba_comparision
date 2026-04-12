@@ -63,7 +63,7 @@ def _train_tf(img_size: int, dataset: str) -> transforms.Compose:
         ]
         base += [transforms.ToTensor(), transforms.Normalize(_MEAN, _STD)]
 
-    else:  # stl10, tiny_imagenet
+    else:  # stl10, cifar100, tiny_imagenet
         base += [
             transforms.RandomCrop(img_size, padding=img_size // 8),
             transforms.RandomHorizontalFlip(),
@@ -179,6 +179,45 @@ def load_stl10(data_path: str, img_size: int, batch_size: int,
 
 
 # ============================================================
+# CIFAR-100
+# ============================================================
+
+def load_cifar100(data_path: str, img_size: int, batch_size: int,
+                  num_workers: int, val_fraction: float = 0.1,
+                  split_seed: int = 42, train_seed: int = 0):
+    """
+    CIFAR-100: 100 classes, 32×32 native (resized to img_size).
+    Official train (50K) and test (10K) splits.
+    We carve val_fraction from train as validation.
+
+    Complexity sits between STL-10 (10 classes) and Tiny ImageNet (200 classes),
+    making it a useful intermediate point for the task-complexity axis.
+
+    Returns: train_loader, val_loader, test_loader, class_names
+    """
+    train_ds_full = datasets.CIFAR100(data_path, train=True,  download=False,
+                                      transform=_train_tf(img_size, "cifar100"))
+    eval_ds_full  = datasets.CIFAR100(data_path, train=True,  download=False,
+                                      transform=_eval_tf(img_size))
+    test_ds       = datasets.CIFAR100(data_path, train=False, download=False,
+                                      transform=_eval_tf(img_size))
+
+    class_names = train_ds_full.classes
+    n     = len(train_ds_full)          # 50,000
+    n_val = int(val_fraction * n)       # 5,000
+
+    idx      = torch.randperm(n, generator=torch.Generator().manual_seed(split_seed)).tolist()
+    train_ds = Subset(train_ds_full, idx[n_val:])   # 45,000
+    val_ds   = Subset(eval_ds_full,  idx[:n_val])   # 5,000
+
+    train_loader = _make_loader(train_ds, batch_size, shuffle=True,  num_workers=num_workers, seed=train_seed)
+    val_loader   = _make_loader(val_ds,   batch_size, shuffle=False, num_workers=num_workers, seed=0)
+    test_loader  = _make_loader(test_ds,  batch_size, shuffle=False, num_workers=num_workers, seed=0)
+
+    return train_loader, val_loader, test_loader, class_names
+
+
+# ============================================================
 # TINY IMAGENET
 # ============================================================
 
@@ -255,6 +294,13 @@ DATASET_INFO = {
         "train_size":       "~4500 (after val split)",
         "complexity":       "MEDIUM (shape + texture mix)",
     },
+    "cifar100": {
+        "default_img_size": 96,
+        "description":      "CIFAR-100 — 100-class object recognition",
+        "classes":          100,
+        "train_size":       "~45000 (after val split)",
+        "complexity":       "MEDIUM-HIGH (100 fine-grained classes)",
+    },
     "tiny_imagenet": {
         "default_img_size": 96,
         "description":      "Tiny ImageNet — high complexity, global reasoning",
@@ -286,6 +332,7 @@ def get_loaders(dataset: str, data_path: str, img_size: int = None,
     loaders = {
         "dtd":           load_dtd,
         "stl10":         load_stl10,
+        "cifar100":      load_cifar100,
         "tiny_imagenet": load_tiny_imagenet,
     }
 

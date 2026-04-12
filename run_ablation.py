@@ -263,7 +263,7 @@ def parse_ablation_args():
 
     # Required
     p.add_argument("--dataset",   required=True,
-                   choices=["dtd","stl10","tiny_imagenet"])
+                   choices=["dtd","stl10","cifar100","tiny_imagenet"])
     _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     p.add_argument("--data_path", default=_default_data)
 

@@ -24,11 +24,19 @@ echo "────────────────────────�
 
 # Submit with -v TASK=<value>
 # Available tasks:
-#   dtd            → full DTD ablation         (~4 hrs)
-#   stl10          → full STL-10 ablation       (~18 hrs)
-#   tiny_np4       → Tiny ImageNet, L=36        (~10 hrs)
-#   tiny_np3       → Tiny ImageNet, L=144       (~25 hrs)
-#   tiny_np2       → Tiny ImageNet, L=576       (~35 hrs)
+#   dtd            → full DTD ablation              (~4 hrs)
+#   stl10          → full STL-10 ablation            (~14 hrs)
+#   tiny_np4       → Tiny ImageNet, L=36   (bs=256) (~18 hrs)
+#   tiny_np3       → Tiny ImageNet, L=144  (bs=256) (~22 hrs)
+#   tiny_np2       → Tiny ImageNet, L=576  (bs=256) (~30 hrs)
+#
+# Timing basis (empirical):
+#   Pure CNN seed=0, bs=128, 100 ep = 6h  → bs=256, 60 ep ≈ 2h/seed
+#   5 models × 3 seeds × ~2-3h = 30-45h  → fits 48h for all jobs
+#
+# NOTE: Tiny ImageNet uses --batch_size 256 --epochs 60 --patience 15
+#   to keep each job within 48h walltime while preserving trend signal.
+#   DTD/STL-10 are unaffected (smaller datasets, fine at original settings).
 
 DATA=/scratch/ravipr49_soe/classification/data
 
@@ -38,33 +46,36 @@ case $TASK in
             --dataset dtd \
             --data_path $DATA \
             --d_model 32 \
-            --epochs 200 --seeds 0 42 99
+            --epochs 200 --patience 30 --seeds 0 42 99
         ;;
     stl10)
         python run_ablation.py \
             --dataset stl10 \
             --data_path $DATA \
-            --epochs 150 --seeds 0 42 99
+            --epochs 150 --patience 25 --seeds 0 42 99
         ;;
     tiny_np4)
         python run_ablation.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
-            --epochs 100 --seeds 0 42 99 \
+            --batch_size 256 \
+            --epochs 60 --patience 15 --seeds 0 42 99 \
             --n_pool_single 4
         ;;
     tiny_np3)
         python run_ablation.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
-            --epochs 100 --seeds 0 42 99 \
+            --batch_size 256 \
+            --epochs 60 --patience 15 --seeds 0 42 99 \
             --n_pool_single 3
         ;;
     tiny_np2)
         python run_ablation.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
-            --epochs 100 --seeds 0 42 99 \
+            --batch_size 256 \
+            --epochs 60 --patience 15 --seeds 0 42 99 \
             --n_pool_single 2
         ;;
     *)

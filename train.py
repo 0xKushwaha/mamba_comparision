@@ -4,20 +4,23 @@ train.py — Universal training script for SSM contribution study.
 Trains a single model variant on a single dataset with one or more seeds.
 Results are saved to JSON for aggregation by run_ablation.py.
 
+Multi-GPU: automatically uses all available GPUs via DataParallel.
+With 2× A100s you can safely double --batch_size for faster throughput.
+
 Usage:
     # Single run
-    python train.py --model cnn_mamba_bi --dataset rice \
-                    --data_path /path/to/Rice_Leaf_AUG --n_pool 3
+    python train.py --model cnn_mamba_bi --dataset stl10 \
+                    --data_path ./data --n_pool 3
 
     # Multi-seed (for mean ± std reporting)
     python train.py --model cnn_mamba_bi --dataset cifar100 \
                     --data_path ./data --n_pool 2 --seeds 0 42 99
 
-    # Full config
-    python train.py --model cnn_attn --dataset tiny_imagenet \
-                    --data_path /path/to/tiny-imagenet-200 \
+    # Full config (multi-GPU, bigger batch)
+    python train.py --model cnn_attn --dataset cifar100 \
+                    --data_path ./data \
                     --n_pool 3 --d_model 64 --n_blocks 2 \
-                    --epochs 100 --lr 2e-3 --batch_size 128 \
+                    --epochs 100 --lr 2e-3 --batch_size 256 \
                     --seeds 0 42 99 --output_dir outputs/
 """
 
@@ -34,6 +37,15 @@ from tqdm import tqdm
 
 from models import build_model, count_params, sequence_length, DISPLAY_NAMES
 from data import get_loaders, DATASET_INFO
+
+
+# ============================================================
+# MULTI-GPU HELPER
+# ============================================================
+
+def unwrap(model: nn.Module) -> nn.Module:
+    """Return the underlying model, unwrapping DataParallel if present."""
+    return model.module if isinstance(model, nn.DataParallel) else model
 
 
 # ============================================================
@@ -86,9 +98,10 @@ def run_epoch(model, loader, criterion, optimizer, device, train: bool = True):
 
 def train_one_seed(args, seed: int, num_classes: int,
                    train_loader, val_loader, test_loader,
-                   device, run_dir: str) -> dict:
+                   device, run_dir: str, n_gpus: int = 1) -> dict:
     """
     Full training run for one seed. Returns result dict.
+    Wraps model in DataParallel when n_gpus > 1.
     """
     seed_everything(seed)
     os.makedirs(run_dir, exist_ok=True)
@@ -102,7 +115,11 @@ def train_one_seed(args, seed: int, num_classes: int,
         n_heads=args.n_heads,
     ).to(device)
 
-    params     = count_params(model)
+    # Wrap in DataParallel for multi-GPU training
+    if n_gpus > 1:
+        model = nn.DataParallel(model)
+
+    params     = count_params(unwrap(model))
     seq_len    = sequence_length(args.img_size, args.n_pool)
 
     criterion  = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
@@ -134,7 +151,8 @@ def train_one_seed(args, seed: int, num_classes: int,
 
         if vl_loss < best_val_loss:
             best_val_loss  = vl_loss
-            best_weights   = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            # Always save from the unwrapped model (no 'module.' prefix in keys)
+            best_weights   = {k: v.cpu().clone() for k, v in unwrap(model).state_dict().items()}
             patience_count = 0
             torch.save(best_weights, best_ckpt)
         else:
@@ -144,7 +162,7 @@ def train_one_seed(args, seed: int, num_classes: int,
                 break
 
     # Final test evaluation with best weights
-    model.load_state_dict(best_weights)
+    unwrap(model).load_state_dict(best_weights)
     te_loss, te_acc = run_epoch(model, test_loader, criterion, None, device, train=False)
 
     return {
@@ -166,14 +184,18 @@ def train_one_seed(args, seed: int, num_classes: int,
 # ============================================================
 
 def train_all_seeds(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpus  = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    device  = torch.device("cuda" if n_gpus > 0 else "cpu")
+    gpu_str = (f"{n_gpus}× GPU (DataParallel)" if n_gpus > 1
+               else ("1× GPU" if n_gpus == 1 else "CPU"))
+
     print(f"\n{'='*65}")
     print(f"  Model   : {DISPLAY_NAMES[args.model]}")
     print(f"  Dataset : {args.dataset}  ({DATASET_INFO[args.dataset]['description']})")
     print(f"  n_pool  : {args.n_pool}  →  L = {sequence_length(args.img_size, args.n_pool)} tokens")
     print(f"  d_model : {args.d_model},  n_blocks: {args.n_blocks},  epochs: {args.epochs}")
     print(f"  Seeds   : {args.seeds}")
-    print(f"  Device  : {device}")
+    print(f"  Device  : {gpu_str}")
     print(f"{'='*65}")
 
     # Experiment output dir:  outputs/<dataset>/<model>_np<n_pool>/
@@ -209,7 +231,7 @@ def train_all_seeds(args):
         )
         result = train_one_seed(args, seed, num_classes,
                                 train_loader, val_loader, test_loader,
-                                device, run_dir)
+                                device, run_dir, n_gpus=n_gpus)
         all_results.append(result)
         print(f"  Seed {seed:>4} →  Test Acc: {result['test_acc']:.2f}%  "
               f"| Params: {result['params_total']:,}  L={result['seq_len']}")
@@ -260,7 +282,7 @@ def parse_args():
                    choices=["pure_cnn","cnn_mlp","cnn_mamba_uni","cnn_mamba_bi","cnn_attn"],
                    help="Model variant")
     p.add_argument("--dataset",    required=True,
-                   choices=["dtd","stl10","tiny_imagenet"],
+                   choices=["dtd","stl10","cifar100","tiny_imagenet"],
                    help="Dataset to train on")
     _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     p.add_argument("--data_path",  default=_default_data,
