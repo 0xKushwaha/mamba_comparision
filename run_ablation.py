@@ -286,7 +286,8 @@ def parse_ablation_args():
     p.add_argument("--split_seed", type=int, default=42)
 
     # I/O
-    p.add_argument("--num_workers",   type=int, default=4)
+    p.add_argument("--num_workers",   type=int, required=True,
+                   help="Number of DataLoader worker processes (must specify: 0=no workers, 1+=parallel)")
     p.add_argument("--output_dir",    default="outputs")
     p.add_argument("--skip_existing", action="store_true",
                    help="Skip experiments whose summary.json already exists (resume)")

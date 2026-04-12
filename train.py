@@ -138,6 +138,13 @@ def train_one_seed(args, seed: int, num_classes: int,
                 dynamic_ncols=True)
 
     for epoch in pbar:
+        if torch.cuda.is_available():
+            gpu_info = " | ".join(
+                f"GPU{i}: {torch.cuda.memory_reserved(i)/1024**2:.0f}MB"
+                for i in range(torch.cuda.device_count())
+            )
+            pbar.write(f"  [Epoch {epoch:>3}] {gpu_info}")
+
         tr_loss, tr_acc = run_epoch(model, train_loader, criterion, optimizer, device, train=True)
         vl_loss, vl_acc = run_epoch(model, val_loader,   criterion, None,      device, train=False)
         scheduler.step()
@@ -314,7 +321,8 @@ def parse_args():
                    help="Fixed seed for train/val/test split (default: 42)")
 
     # I/O
-    p.add_argument("--num_workers", type=int, default=4)
+    p.add_argument("--num_workers", type=int, required=True,
+                   help="Number of DataLoader worker processes (must specify: 0=no workers, 1+=parallel)")
     p.add_argument("--output_dir",  default="outputs",
                    help="Root output directory (default: outputs/)")
 
