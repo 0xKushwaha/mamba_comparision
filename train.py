@@ -44,7 +44,7 @@ from data import get_loaders, DATASET_INFO
 # ============================================================
 
 def unwrap(model: nn.Module) -> nn.Module:
-    """Return the underlying model, unwrapping DataParallel if present."""
+    """Return underlying model, stripping DataParallel wrapper if present."""
     return model.module if isinstance(model, nn.DataParallel) else model
 
 
@@ -100,14 +100,12 @@ def train_one_seed(args, seed: int, num_classes: int,
                    train_loader, val_loader, test_loader,
                    device, run_dir: str, n_gpus: int = 1) -> dict:
     """
-    Full training run for one seed. Returns result dict.
-    Wraps model in DataParallel when n_gpus > 1.
+    Full training run for one seed. Uses DataParallel when n_gpus > 1.
     """
     seed_everything(seed)
     os.makedirs(run_dir, exist_ok=True)
     best_ckpt = os.path.join(run_dir, f"best_seed{seed}.pth")
 
-    # Build model
     model = build_model(
         args.model, num_classes,
         d_model=args.d_model, n_pool=args.n_pool,
@@ -115,12 +113,11 @@ def train_one_seed(args, seed: int, num_classes: int,
         n_heads=args.n_heads,
     ).to(device)
 
-    # Wrap in DataParallel for multi-GPU training
     if n_gpus > 1:
         model = nn.DataParallel(model)
 
-    params     = count_params(unwrap(model))
-    seq_len    = sequence_length(args.img_size, args.n_pool)
+    params  = count_params(unwrap(model))
+    seq_len = sequence_length(args.img_size, args.n_pool)
 
     criterion  = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer  = torch.optim.AdamW(model.parameters(), lr=args.lr,
@@ -158,7 +155,6 @@ def train_one_seed(args, seed: int, num_classes: int,
 
         if vl_loss < best_val_loss:
             best_val_loss  = vl_loss
-            # Always save from the unwrapped model (no 'module.' prefix in keys)
             best_weights   = {k: v.cpu().clone() for k, v in unwrap(model).state_dict().items()}
             patience_count = 0
             torch.save(best_weights, best_ckpt)
@@ -205,19 +201,15 @@ def train_all_seeds(args):
     print(f"  Device  : {gpu_str}")
     print(f"{'='*65}")
 
-    # Experiment output dir:  outputs/<dataset>/<model>_np<n_pool>/
     run_dir = os.path.join(args.output_dir, args.dataset,
                            f"{args.model}_np{args.n_pool}")
     os.makedirs(run_dir, exist_ok=True)
 
-    # Load data once (fixed split_seed ensures same train/val/test across all seeds)
     train_loader, val_loader, test_loader, class_names = get_loaders(
         args.dataset, args.data_path,
-        img_size=args.img_size,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        split_seed=args.split_seed,
-        train_seed=args.seeds[0],   # initial; re-seeded per run inside loop
+        img_size=args.img_size, batch_size=args.batch_size,
+        num_workers=args.num_workers, split_seed=args.split_seed,
+        train_seed=args.seeds[0],
     )
     num_classes = len(class_names)
     print(f"  Classes : {num_classes}  |  "
@@ -227,13 +219,10 @@ def train_all_seeds(args):
 
     all_results = []
     for seed in args.seeds:
-        # Reload loaders with per-seed shuffle seed for fair multi-seed comparison
         train_loader, val_loader, test_loader, _ = get_loaders(
             args.dataset, args.data_path,
-            img_size=args.img_size,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            split_seed=args.split_seed,
+            img_size=args.img_size, batch_size=args.batch_size,
+            num_workers=args.num_workers, split_seed=args.split_seed,
             train_seed=seed,
         )
         result = train_one_seed(args, seed, num_classes,

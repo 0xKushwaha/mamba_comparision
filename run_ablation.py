@@ -164,13 +164,15 @@ def run_ablation(args):
     # Support running a single n_pool value (for splitting large jobs)
     n_pool_range = [args.n_pool_single] if args.n_pool_single else N_POOL_RANGE
 
-    total_runs  = len(ALL_MODELS) * len(n_pool_range)
+    models_to_run = args.models
+
+    total_runs  = len(models_to_run) * len(n_pool_range)
     run_counter = 0
 
     print(f"\n{'#'*65}")
     print(f"  ABLATION STUDY")
     print(f"  Dataset  : {dataset} ({DATASET_INFO[dataset]['description']})")
-    print(f"  Models   : {len(ALL_MODELS)}")
+    print(f"  Models   : {len(models_to_run)} {models_to_run}")
     print(f"  n_pool   : {n_pool_range}")
     print(f"  Seeds    : {args.seeds}")
     print(f"  Total    : {total_runs} experiments × {len(args.seeds)} seeds each")
@@ -178,7 +180,7 @@ def run_ablation(args):
     print(f"{'#'*65}\n")
 
     for n_pool in n_pool_range:
-        for model_type in ALL_MODELS:
+        for model_type in models_to_run:
             run_counter += 1
             run_dir = os.path.join(output_dir, f"{model_type}_np{n_pool}")
             summary_path = os.path.join(run_dir, "summary.json")
@@ -219,6 +221,18 @@ def run_ablation(args):
 
             summary = train_all_seeds(run_args)
             all_results.append(summary)
+
+    # Merge with any existing results from previous runs
+    # This prevents overwriting results from other models trained in separate jobs
+    seen_keys = {(r["model"], r["n_pool"]) for r in all_results}
+    for model_type in ALL_MODELS:
+        for n_pool in N_POOL_RANGE:
+            if (model_type, n_pool) in seen_keys:
+                continue   # already in current run
+            existing = os.path.join(output_dir, f"{model_type}_np{n_pool}", "summary.json")
+            if os.path.exists(existing):
+                with open(existing) as f:
+                    all_results.append(json.load(f))
 
     # Build and print results table
     df = build_table(all_results, dataset)
@@ -264,6 +278,10 @@ def parse_ablation_args():
     # Required
     p.add_argument("--dataset",   required=True,
                    choices=["dtd","stl10","cifar100","tiny_imagenet"])
+    p.add_argument("--models",    nargs="+", default=ALL_MODELS,
+                   choices=ALL_MODELS,
+                   help="Model variants to train (default: all 5). "
+                        "e.g. --models cnn_mamba_bi cnn_mlp")
     _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     p.add_argument("--data_path", default=_default_data)
 
