@@ -15,7 +15,7 @@ Usage:
     python download_data.py --data_path ./data --verify_only
 
 After downloading, run the ablation:
-    python run_ablation.py --dataset cifar100 --data_path ./data --epochs 100
+    python run_all.py --dataset cifar100 --data_path ./data --epochs 100
 """
 
 import os
@@ -254,7 +254,7 @@ def main():
         print(f"  {'Verified' if args.verify_only else 'Downloaded'} : {args.datasets}  ✓")
         print(f"\n  Ready to run ablation:")
         for ds in args.datasets:
-            print(f"    python run_ablation.py --dataset {ds} "
+            print(f"    python run_all.py --dataset {ds} "
                   f"--data_path {os.path.abspath(args.data_path)} --epochs 100")
     print("=" * 60)
 

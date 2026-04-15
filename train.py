@@ -2,7 +2,7 @@
 train.py — Universal training script for SSM contribution study.
 
 Trains a single model variant on a single dataset with one or more seeds.
-Results are saved to JSON for aggregation by run_ablation.py.
+Results are saved to JSON for aggregation by run_all.py.
 
 Multi-GPU: automatically uses all available GPUs via DataParallel.
 With 2× A100s you can safely double --batch_size for faster throughput.
@@ -44,8 +44,14 @@ from data import get_loaders, DATASET_INFO
 # ============================================================
 
 def unwrap(model: nn.Module) -> nn.Module:
-    """Return underlying model, stripping DataParallel wrapper if present."""
-    return model.module if isinstance(model, nn.DataParallel) else model
+    """Return underlying model, stripping torch.compile and DataParallel wrappers."""
+    # Strip torch.compile wrapper (OptimizedModule stores original in _orig_mod)
+    if hasattr(model, '_orig_mod'):
+        model = model._orig_mod
+    # Strip DataParallel wrapper
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+    return model
 
 
 # ============================================================
@@ -66,9 +72,11 @@ def seed_everything(seed: int):
 # TRAIN / EVAL EPOCH
 # ============================================================
 
-def run_epoch(model, loader, criterion, optimizer, device, train: bool = True):
+def run_epoch(model, loader, criterion, optimizer, device,
+              train: bool = True, scaler=None):
     model.train(train)
     total_loss = correct = total = 0
+    use_amp = scaler is not None
 
     ctx = torch.enable_grad() if train else torch.no_grad()
     with ctx:
@@ -77,13 +85,21 @@ def run_epoch(model, loader, criterion, optimizer, device, train: bool = True):
             if train:
                 optimizer.zero_grad()
 
-            logits = model(imgs)
-            loss   = criterion(logits, labels)
+            with torch.amp.autocast("cuda", enabled=use_amp):
+                logits = model(imgs)
+                loss   = criterion(logits, labels)
 
             if train:
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                optimizer.step()
+                if use_amp:
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
+                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
 
             total_loss += loss.item() * imgs.size(0)
             correct    += (logits.argmax(1) == labels).sum().item()
@@ -113,11 +129,26 @@ def train_one_seed(args, seed: int, num_classes: int,
         n_heads=args.n_heads,
     ).to(device)
 
+    # DataParallel across all GPUs (must come BEFORE torch.compile)
     if n_gpus > 1:
         model = nn.DataParallel(model)
 
+    # torch.compile — JIT-compiles model for faster GPU execution (PyTorch 2.0+)
+    # Skipped for Mamba variants: their custom CUDA selective-scan kernels contain
+    # C-extension calls (_thread.get_ident) that Dynamo cannot trace, so compile
+    # would silently fall back to eager and only add overhead.
+    _mamba_models = {"cnn_mamba_uni", "cnn_mamba_bi"}
+    if args.model not in _mamba_models:
+        try:
+            model = torch.compile(model, mode="reduce-overhead")
+        except Exception:
+            pass   # silently skip if torch.compile unavailable
+
     params  = count_params(unwrap(model))
     seq_len = sequence_length(args.img_size, args.n_pool)
+
+    # AMP scaler — float16 on A100 tensor cores (~2x throughput)
+    scaler = torch.amp.GradScaler("cuda") if torch.cuda.is_available() else None
 
     criterion  = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer  = torch.optim.AdamW(model.parameters(), lr=args.lr,
@@ -142,8 +173,8 @@ def train_one_seed(args, seed: int, num_classes: int,
             )
             pbar.write(f"  [Epoch {epoch:>3}] {gpu_info}")
 
-        tr_loss, tr_acc = run_epoch(model, train_loader, criterion, optimizer, device, train=True)
-        vl_loss, vl_acc = run_epoch(model, val_loader,   criterion, None,      device, train=False)
+        tr_loss, tr_acc = run_epoch(model, train_loader, criterion, optimizer, device, train=True,  scaler=scaler)
+        vl_loss, vl_acc = run_epoch(model, val_loader,   criterion, None,      device, train=False, scaler=None)
         scheduler.step()
 
         history["train_loss"].append(tr_loss)
@@ -166,20 +197,27 @@ def train_one_seed(args, seed: int, num_classes: int,
 
     # Final test evaluation with best weights
     unwrap(model).load_state_dict(best_weights)
-    te_loss, te_acc = run_epoch(model, test_loader, criterion, None, device, train=False)
+    te_loss, te_acc = run_epoch(model, test_loader, criterion, None, device, train=False, scaler=None)
 
-    return {
-        "seed":        seed,
-        "test_acc":    round(te_acc * 100, 4),
-        "test_loss":   round(te_loss, 6),
+    result = {
+        "seed":          seed,
+        "test_acc":      round(te_acc * 100, 4),
+        "test_loss":     round(te_loss, 6),
         "best_val_loss": round(best_val_loss, 6),
-        "params_total": params["total"],
-        "params_seq":   params["seq"],
-        "size_kb":      round(params["size_kb"], 2),
-        "seq_len":      seq_len,
-        "ckpt":         best_ckpt,
-        "history":      history,
+        "params_total":  params["total"],
+        "params_seq":    params["seq"],
+        "size_kb":       round(params["size_kb"], 2),
+        "seq_len":       seq_len,
+        "ckpt":          best_ckpt,
+        "history":       history,
     }
+
+    # Save individual seed result — allows parallel per-seed jobs without overwriting
+    seed_result_path = os.path.join(run_dir, f"seed_{seed}_result.json")
+    with open(seed_result_path, "w") as f:
+        json.dump({k: v for k, v in result.items() if k != "history"}, f, indent=2)
+
+    return result
 
 
 # ============================================================
@@ -232,7 +270,18 @@ def train_all_seeds(args):
         print(f"  Seed {seed:>4} →  Test Acc: {result['test_acc']:.2f}%  "
               f"| Params: {result['params_total']:,}  L={result['seq_len']}")
 
-    # Summary statistics
+    # Merge with any seed results saved by other jobs running separately
+    trained_seeds = {r["seed"] for r in all_results}
+    for fname in sorted(os.listdir(run_dir)):
+        if fname.startswith("seed_") and fname.endswith("_result.json"):
+            s = int(fname.split("_")[1])
+            if s not in trained_seeds:
+                with open(os.path.join(run_dir, fname)) as f:
+                    all_results.append(json.load(f))
+
+    all_results = sorted(all_results, key=lambda r: r["seed"])
+
+    # Summary statistics across all available seeds
     accs = [r["test_acc"] for r in all_results]
     summary = {
         "model":        args.model,
@@ -242,7 +291,7 @@ def train_all_seeds(args):
         "seq_len":      sequence_length(args.img_size, args.n_pool),
         "d_model":      args.d_model,
         "n_blocks":     args.n_blocks,
-        "seeds":        args.seeds,
+        "seeds":        [r["seed"] for r in all_results],
         "mean_acc":     round(float(np.mean(accs)), 4),
         "std_acc":      round(float(np.std(accs)),  4),
         "best_acc":     round(float(np.max(accs)),  4),
@@ -254,13 +303,13 @@ def train_all_seeds(args):
                          for r in all_results],
     }
 
-    # Save results
+    # Save summary
     summary_path = os.path.join(run_dir, "summary.json")
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
 
     print(f"\n  Result : {np.mean(accs):.2f}% ± {np.std(accs):.2f}%  "
-          f"(best={np.max(accs):.2f}%)")
+          f"(best={np.max(accs):.2f}%)  [{len(all_results)} seeds]")
     print(f"  Saved  : {summary_path}")
 
     return summary

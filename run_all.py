@@ -1,5 +1,5 @@
 """
-run_ablation.py — Runs the full experiment matrix for the SSM contribution study.
+run_all.py — Runs the full experiment matrix for the SSM contribution study.
 
 For a given dataset, trains all 5 model variants × all n_pool values × all seeds.
 Aggregates results into a publication-ready table.
@@ -16,20 +16,20 @@ All three share image size 96×96 → identical sequence lengths:
 
 Usage:
     # DTD — texture (auto-downloads)
-    python run_ablation.py --dataset dtd --data_path ./data
+    python run_all.py --dataset dtd --data_path ./data
 
     # STL-10 — mixed (auto-downloads)
-    python run_ablation.py --dataset stl10 --data_path ./data
+    python run_all.py --dataset stl10 --data_path ./data
 
     # Tiny ImageNet — complex (manual download required)
-    python run_ablation.py --dataset tiny_imagenet --data_path /path/to/tiny-imagenet-200
+    python run_all.py --dataset tiny_imagenet --data_path /path/to/tiny-imagenet-200
 
     # Custom config
-    python run_ablation.py --dataset stl10 --data_path ./data \
+    python run_all.py --dataset stl10 --data_path ./data \
         --seeds 0 42 99 --epochs 150 --d_model 64 --n_blocks 2
 
     # Resume a crashed run (skips completed experiments)
-    python run_ablation.py --dataset dtd --data_path ./data --skip_existing
+    python run_all.py --dataset dtd --data_path ./data --skip_existing
 """
 
 import os

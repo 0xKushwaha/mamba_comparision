@@ -42,20 +42,20 @@ DATA=/scratch/ravipr49_soe/classification/data
 
 case $TASK in
     dtd)
-        python run_ablation.py \
+        python run_all.py \
             --dataset dtd \
             --data_path $DATA \
             --d_model 32 \
             --epochs 200 --patience 30 --seeds 0 42 99
         ;;
     stl10)
-        python run_ablation.py \
+        python run_all.py \
             --dataset stl10 \
             --data_path $DATA \
             --epochs 150 --patience 25 --seeds 0 42 99
         ;;
     tiny_np4)
-        python run_ablation.py \
+        python run_all.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
             --batch_size 256 \
@@ -63,7 +63,7 @@ case $TASK in
             --n_pool_single 4
         ;;
     tiny_np3)
-        python run_ablation.py \
+        python run_all.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
             --batch_size 256 \
@@ -71,7 +71,7 @@ case $TASK in
             --n_pool_single 3
         ;;
     tiny_np2)
-        python run_ablation.py \
+        python run_all.py \
             --dataset tiny_imagenet \
             --data_path $DATA \
             --batch_size 256 \
