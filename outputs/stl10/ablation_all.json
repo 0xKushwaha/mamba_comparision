@@ -1,0 +1,842 @@
+[
+  {
+    "model": "pure_cnn",
+    "model_name": "Pure CNN",
+    "dataset": "stl10",
+    "n_pool": 4,
+    "seq_len": 36,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 65.8333,
+    "std_acc": 0.7848,
+    "best_acc": 66.4375,
+    "params_total": 9450,
+    "params_seq": 0,
+    "size_kb": 36.91,
+    "timestamp": "2026-03-30T01:04:39.951614",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 64.725,
+        "test_loss": 1.194112,
+        "best_val_loss": 1.222363,
+        "params_total": 9450,
+        "params_seq": 0,
+        "size_kb": 36.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/pure_cnn_np4/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 66.4375,
+        "test_loss": 1.141416,
+        "best_val_loss": 1.157452,
+        "params_total": 9450,
+        "params_seq": 0,
+        "size_kb": 36.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/pure_cnn_np4/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 66.3375,
+        "test_loss": 1.152685,
+        "best_val_loss": 1.219574,
+        "params_total": 9450,
+        "params_seq": 0,
+        "size_kb": 36.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/pure_cnn_np4/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mlp",
+    "model_name": "CNN + MLP",
+    "dataset": "stl10",
+    "n_pool": 4,
+    "seq_len": 36,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 69.3417,
+    "std_acc": 0.1129,
+    "best_acc": 69.4875,
+    "params_total": 75882,
+    "params_seq": 66432,
+    "size_kb": 296.41,
+    "timestamp": "2026-03-30T01:45:39.095493",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 69.325,
+        "test_loss": 1.083166,
+        "best_val_loss": 1.120982,
+        "params_total": 75882,
+        "params_seq": 66432,
+        "size_kb": 296.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mlp_np4/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 69.2125,
+        "test_loss": 1.074174,
+        "best_val_loss": 1.036537,
+        "params_total": 75882,
+        "params_seq": 66432,
+        "size_kb": 296.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mlp_np4/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 69.4875,
+        "test_loss": 1.082682,
+        "best_val_loss": 1.069263,
+        "params_total": 75882,
+        "params_seq": 66432,
+        "size_kb": 296.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mlp_np4/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_uni",
+    "model_name": "CNN + Mamba (Uni)",
+    "dataset": "stl10",
+    "n_pool": 4,
+    "seq_len": 36,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 71.7958,
+    "std_acc": 0.0793,
+    "best_acc": 71.875,
+    "params_total": 77034,
+    "params_seq": 67584,
+    "size_kb": 300.91,
+    "timestamp": "2026-03-30T02:34:29.257190",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 71.6875,
+        "test_loss": 1.029953,
+        "best_val_loss": 1.087699,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np4/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 71.825,
+        "test_loss": 1.028046,
+        "best_val_loss": 0.995199,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np4/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 71.875,
+        "test_loss": 1.033474,
+        "best_val_loss": 1.070349,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np4/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_bi",
+    "model_name": "CNN + Mamba (Bi)",
+    "dataset": "stl10",
+    "n_pool": 4,
+    "seq_len": 36,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 71.0208,
+    "std_acc": 0.6602,
+    "best_acc": 71.8625,
+    "params_total": 77034,
+    "params_seq": 67584,
+    "size_kb": 300.91,
+    "timestamp": "2026-03-30T03:25:50.945917",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 71.8625,
+        "test_loss": 1.035971,
+        "best_val_loss": 1.046268,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np4/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 70.95,
+        "test_loss": 1.048567,
+        "best_val_loss": 1.044492,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np4/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 70.25,
+        "test_loss": 1.05978,
+        "best_val_loss": 1.065554,
+        "params_total": 77034,
+        "params_seq": 67584,
+        "size_kb": 300.91,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np4/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_attn",
+    "model_name": "CNN + Attention",
+    "dataset": "stl10",
+    "n_pool": 4,
+    "seq_len": 36,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 69.8625,
+    "std_acc": 0.7319,
+    "best_acc": 70.85,
+    "params_total": 109418,
+    "params_seq": 99968,
+    "size_kb": 427.41,
+    "timestamp": "2026-03-30T04:07:01.848482",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 69.1,
+        "test_loss": 1.061748,
+        "best_val_loss": 1.070643,
+        "params_total": 109418,
+        "params_seq": 99968,
+        "size_kb": 427.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_attn_np4/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 70.85,
+        "test_loss": 1.013645,
+        "best_val_loss": 1.042705,
+        "params_total": 109418,
+        "params_seq": 99968,
+        "size_kb": 427.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_attn_np4/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 69.6375,
+        "test_loss": 1.026422,
+        "best_val_loss": 1.002411,
+        "params_total": 109418,
+        "params_seq": 99968,
+        "size_kb": 427.41,
+        "seq_len": 36,
+        "ckpt": "outputs/stl10/cnn_attn_np4/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "pure_cnn",
+    "model_name": "Pure CNN",
+    "dataset": "stl10",
+    "n_pool": 3,
+    "seq_len": 144,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 58.5,
+    "std_acc": 0.4364,
+    "best_acc": 59.1,
+    "params_total": 4522,
+    "params_seq": 0,
+    "size_kb": 17.66,
+    "timestamp": "2026-03-30T04:47:36.091011",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 58.075,
+        "test_loss": 1.342121,
+        "best_val_loss": 1.399948,
+        "params_total": 4522,
+        "params_seq": 0,
+        "size_kb": 17.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/pure_cnn_np3/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 59.1,
+        "test_loss": 1.300141,
+        "best_val_loss": 1.329356,
+        "params_total": 4522,
+        "params_seq": 0,
+        "size_kb": 17.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/pure_cnn_np3/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 58.325,
+        "test_loss": 1.323539,
+        "best_val_loss": 1.357631,
+        "params_total": 4522,
+        "params_seq": 0,
+        "size_kb": 17.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/pure_cnn_np3/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mlp",
+    "model_name": "CNN + MLP",
+    "dataset": "stl10",
+    "n_pool": 3,
+    "seq_len": 144,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 64.65,
+    "std_acc": 0.3894,
+    "best_acc": 65.15,
+    "params_total": 70954,
+    "params_seq": 66432,
+    "size_kb": 277.16,
+    "timestamp": "2026-03-30T05:30:30.279013",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 65.15,
+        "test_loss": 1.179088,
+        "best_val_loss": 1.206357,
+        "params_total": 70954,
+        "params_seq": 66432,
+        "size_kb": 277.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mlp_np3/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 64.6,
+        "test_loss": 1.185936,
+        "best_val_loss": 1.200029,
+        "params_total": 70954,
+        "params_seq": 66432,
+        "size_kb": 277.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mlp_np3/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 64.2,
+        "test_loss": 1.187296,
+        "best_val_loss": 1.218031,
+        "params_total": 70954,
+        "params_seq": 66432,
+        "size_kb": 277.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mlp_np3/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_uni",
+    "model_name": "CNN + Mamba (Uni)",
+    "dataset": "stl10",
+    "n_pool": 3,
+    "seq_len": 144,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 71.975,
+    "std_acc": 0.4339,
+    "best_acc": 72.3125,
+    "params_total": 72106,
+    "params_seq": 67584,
+    "size_kb": 281.66,
+    "timestamp": "2026-03-30T07:00:33.655457",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 72.25,
+        "test_loss": 1.015276,
+        "best_val_loss": 1.020592,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np3/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 72.3125,
+        "test_loss": 1.015287,
+        "best_val_loss": 1.026357,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np3/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 71.3625,
+        "test_loss": 1.035534,
+        "best_val_loss": 1.05392,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np3/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_bi",
+    "model_name": "CNN + Mamba (Bi)",
+    "dataset": "stl10",
+    "n_pool": 3,
+    "seq_len": 144,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 71.4833,
+    "std_acc": 0.3419,
+    "best_acc": 71.9375,
+    "params_total": 72106,
+    "params_seq": 67584,
+    "size_kb": 281.66,
+    "timestamp": "2026-03-30T09:21:03.269112",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 71.9375,
+        "test_loss": 1.02385,
+        "best_val_loss": 1.061081,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np3/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 71.4,
+        "test_loss": 1.035962,
+        "best_val_loss": 1.051675,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np3/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 71.1125,
+        "test_loss": 1.049089,
+        "best_val_loss": 1.099662,
+        "params_total": 72106,
+        "params_seq": 67584,
+        "size_kb": 281.66,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np3/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_attn",
+    "model_name": "CNN + Attention",
+    "dataset": "stl10",
+    "n_pool": 3,
+    "seq_len": 144,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 66.5708,
+    "std_acc": 0.3314,
+    "best_acc": 67.0375,
+    "params_total": 104490,
+    "params_seq": 99968,
+    "size_kb": 408.16,
+    "timestamp": "2026-03-30T10:04:04.519630",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 66.3,
+        "test_loss": 1.117619,
+        "best_val_loss": 1.136704,
+        "params_total": 104490,
+        "params_seq": 99968,
+        "size_kb": 408.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_attn_np3/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 67.0375,
+        "test_loss": 1.104804,
+        "best_val_loss": 1.172476,
+        "params_total": 104490,
+        "params_seq": 99968,
+        "size_kb": 408.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_attn_np3/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 66.375,
+        "test_loss": 1.115411,
+        "best_val_loss": 1.104721,
+        "params_total": 104490,
+        "params_seq": 99968,
+        "size_kb": 408.16,
+        "seq_len": 144,
+        "ckpt": "outputs/stl10/cnn_attn_np3/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "pure_cnn",
+    "model_name": "Pure CNN",
+    "dataset": "stl10",
+    "n_pool": 2,
+    "seq_len": 576,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 52.3958,
+    "std_acc": 0.8024,
+    "best_acc": 53.3,
+    "params_total": 4234,
+    "params_seq": 0,
+    "size_kb": 16.54,
+    "timestamp": "2026-03-30T10:47:08.804745",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 51.35,
+        "test_loss": 1.481227,
+        "best_val_loss": 1.531175,
+        "params_total": 4234,
+        "params_seq": 0,
+        "size_kb": 16.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/pure_cnn_np2/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 53.3,
+        "test_loss": 1.448175,
+        "best_val_loss": 1.529905,
+        "params_total": 4234,
+        "params_seq": 0,
+        "size_kb": 16.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/pure_cnn_np2/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 52.5375,
+        "test_loss": 1.457992,
+        "best_val_loss": 1.514981,
+        "params_total": 4234,
+        "params_seq": 0,
+        "size_kb": 16.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/pure_cnn_np2/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mlp",
+    "model_name": "CNN + MLP",
+    "dataset": "stl10",
+    "n_pool": 2,
+    "seq_len": 576,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 63.4042,
+    "std_acc": 0.7299,
+    "best_acc": 64.2875,
+    "params_total": 70666,
+    "params_seq": 66432,
+    "size_kb": 276.04,
+    "timestamp": "2026-03-30T11:30:26.245965",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 62.5,
+        "test_loss": 1.253957,
+        "best_val_loss": 1.297867,
+        "params_total": 70666,
+        "params_seq": 66432,
+        "size_kb": 276.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mlp_np2/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 63.425,
+        "test_loss": 1.220961,
+        "best_val_loss": 1.285131,
+        "params_total": 70666,
+        "params_seq": 66432,
+        "size_kb": 276.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mlp_np2/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 64.2875,
+        "test_loss": 1.207493,
+        "best_val_loss": 1.244413,
+        "params_total": 70666,
+        "params_seq": 66432,
+        "size_kb": 276.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mlp_np2/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_uni",
+    "model_name": "CNN + Mamba (Uni)",
+    "dataset": "stl10",
+    "n_pool": 2,
+    "seq_len": 576,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 72.6667,
+    "std_acc": 1.1416,
+    "best_acc": 74.2,
+    "params_total": 71818,
+    "params_seq": 67584,
+    "size_kb": 280.54,
+    "timestamp": "2026-03-30T22:42:06.021876",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 74.2,
+        "test_loss": 0.992396,
+        "best_val_loss": 0.971712,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np2/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 71.4625,
+        "test_loss": 1.047419,
+        "best_val_loss": 1.084622,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np2/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 72.3375,
+        "test_loss": 1.018842,
+        "best_val_loss": 1.040418,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_uni_np2/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_mamba_bi",
+    "model_name": "CNN + Mamba (Bi)",
+    "dataset": "stl10",
+    "n_pool": 2,
+    "seq_len": 576,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 72.1375,
+    "std_acc": 0.2606,
+    "best_acc": 72.4875,
+    "params_total": 71818,
+    "params_seq": 67584,
+    "size_kb": 280.54,
+    "timestamp": "2026-03-31T20:37:30.915984",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 72.4875,
+        "test_loss": 1.009006,
+        "best_val_loss": 0.992925,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np2/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 72.0625,
+        "test_loss": 1.036375,
+        "best_val_loss": 1.072111,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np2/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 71.8625,
+        "test_loss": 1.032136,
+        "best_val_loss": 1.087657,
+        "params_total": 71818,
+        "params_seq": 67584,
+        "size_kb": 280.54,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_mamba_bi_np2/best_seed99.pth"
+      }
+    ]
+  },
+  {
+    "model": "cnn_attn",
+    "model_name": "CNN + Attention",
+    "dataset": "stl10",
+    "n_pool": 2,
+    "seq_len": 576,
+    "d_model": 64,
+    "n_blocks": 2,
+    "seeds": [
+      0,
+      42,
+      99
+    ],
+    "mean_acc": 66.975,
+    "std_acc": 0.5844,
+    "best_acc": 67.5125,
+    "params_total": 104202,
+    "params_seq": 99968,
+    "size_kb": 407.04,
+    "timestamp": "2026-03-31T21:24:17.181942",
+    "per_seed": [
+      {
+        "seed": 0,
+        "test_acc": 67.5125,
+        "test_loss": 1.102602,
+        "best_val_loss": 1.084288,
+        "params_total": 104202,
+        "params_seq": 99968,
+        "size_kb": 407.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_attn_np2/best_seed0.pth"
+      },
+      {
+        "seed": 42,
+        "test_acc": 66.1625,
+        "test_loss": 1.118439,
+        "best_val_loss": 1.075525,
+        "params_total": 104202,
+        "params_seq": 99968,
+        "size_kb": 407.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_attn_np2/best_seed42.pth"
+      },
+      {
+        "seed": 99,
+        "test_acc": 67.25,
+        "test_loss": 1.099294,
+        "best_val_loss": 1.144159,
+        "params_total": 104202,
+        "params_seq": 99968,
+        "size_kb": 407.04,
+        "seq_len": 576,
+        "ckpt": "outputs/stl10/cnn_attn_np2/best_seed99.pth"
+      }
+    ]
+  }
+]

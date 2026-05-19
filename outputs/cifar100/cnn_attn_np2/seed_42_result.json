@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "test_acc": 52.49,
+  "test_loss": 2.055759,
+  "best_val_loss": 2.037651,
+  "params_total": 110052,
+  "params_seq": 99968,
+  "size_kb": 429.89,
+  "seq_len": 576,
+  "ckpt": "outputs/cifar100/cnn_attn_np2/best_seed42.pth"
+}

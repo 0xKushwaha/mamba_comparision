@@ -2,17 +2,17 @@
 data.py — Dataset loaders for all three experimental datasets.
 
 Supported datasets:
-  dtd           — Describable Textures Dataset (torchvision, auto-download)
-                  47 texture classes, 5640 images, official train/val/test splits
-                  → Local texture task: CNN should dominate regardless of L
+  dtd     — Describable Textures Dataset (torchvision, auto-download)
+            47 texture classes, 5640 images, official train/val/test splits
+            → Local texture task: CNN should dominate regardless of L
 
-  stl10         — STL-10 (torchvision, auto-download)
-                  10 object classes, 5000 train / 8000 test, native 96×96
-                  → Mixed complexity: transition zone between texture and global
+  stl10   — STL-10 (torchvision, auto-download)
+            10 object classes, 5000 train / 8000 test, native 96×96
+            → Mixed complexity: transition zone between texture and global
 
-  tiny_imagenet — Tiny ImageNet (ImageFolder, manual download required)
-                  200 classes, 100K images, resized to 96×96
-                  → High complexity: global spatial reasoning, SSM should help
+  cifar100 — CIFAR-100 (torchvision, auto-download)
+             100 classes, 50K train / 10K test, resized to 96×96
+             → Medium-high complexity: 100 fine-grained classes
 
 All three datasets are resized to a common 96×96 resolution so that
 sequence lengths L ∈ {36, 144, 576} are identical across datasets.
@@ -63,7 +63,7 @@ def _train_tf(img_size: int, dataset: str) -> transforms.Compose:
         ]
         base += [transforms.ToTensor(), transforms.Normalize(_MEAN, _STD)]
 
-    else:  # stl10, cifar100, tiny_imagenet
+    else:  # stl10, cifar100
         base += [
             transforms.RandomCrop(img_size, padding=img_size // 8),
             transforms.RandomHorizontalFlip(),
@@ -103,6 +103,7 @@ def _make_loader(dataset, batch_size: int, shuffle: bool,
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=num_workers > 0,
         generator=g if shuffle else None,
         worker_init_fn=_seed_worker,
     )
@@ -218,64 +219,6 @@ def load_cifar100(data_path: str, img_size: int, batch_size: int,
 
 
 # ============================================================
-# TINY IMAGENET
-# ============================================================
-
-def load_tiny_imagenet(data_path: str, img_size: int, batch_size: int,
-                       num_workers: int, split_seed: int = 42, train_seed: int = 0):
-    """
-    Tiny ImageNet — 200 classes, 100K images (64×64 native, resized to img_size).
-
-    Expects this directory structure:
-        data_path/
-            train/   (200 class subdirectories, 500 images each)
-            val/     (200 class subdirectories, 50 images each)
-
-    NOTE: The official download has val/ in a flat layout (all images in one folder
-    with a val_annotations.txt file). You must rearrange it first:
-
-        python -c "
-        import os, shutil
-        val_dir = '/path/to/tiny-imagenet-200/val'
-        with open(os.path.join(val_dir, 'val_annotations.txt')) as f:
-            for line in f:
-                fname, cls = line.split()[:2]
-                os.makedirs(os.path.join(val_dir, cls), exist_ok=True)
-                shutil.move(os.path.join(val_dir, 'images', fname),
-                            os.path.join(val_dir, cls, fname))
-        "
-
-    Returns: train_loader, val_loader, test_loader, class_names
-    (test_loader = val_loader — Tiny ImageNet has no public test labels)
-    """
-    # Accept either:
-    #   data_path = .../data                  → appends tiny-imagenet-200/
-    #   data_path = .../data/tiny-imagenet-200 → uses directly
-    if os.path.basename(data_path) == "tiny-imagenet-200":
-        tiny_root = data_path
-    else:
-        tiny_root = os.path.join(data_path, "tiny-imagenet-200")
-
-    train_path = os.path.join(tiny_root, "train")
-    val_path   = os.path.join(tiny_root, "val")
-
-    if not os.path.isdir(train_path):
-        raise FileNotFoundError(
-            f"Tiny ImageNet train/ not found at: {train_path}\n"
-            "Download: http://cs231n.stanford.edu/tiny-imagenet-200.zip\n"
-            "Then rearrange val/ (see docstring above).")
-
-    train_ds    = datasets.ImageFolder(train_path, transform=_train_tf(img_size, "tiny_imagenet"))
-    val_ds      = datasets.ImageFolder(val_path,   transform=_eval_tf(img_size))
-    class_names = train_ds.classes
-
-    train_loader = _make_loader(train_ds, batch_size, shuffle=True,  num_workers=num_workers, seed=train_seed)
-    val_loader   = _make_loader(val_ds,   batch_size, shuffle=False, num_workers=num_workers, seed=0)
-
-    return train_loader, val_loader, val_loader, class_names   # test = val
-
-
-# ============================================================
 # UNIFIED LOADER FACTORY
 # ============================================================
 
@@ -301,13 +244,6 @@ DATASET_INFO = {
         "train_size":       "~45000 (after val split)",
         "complexity":       "MEDIUM-HIGH (100 fine-grained classes)",
     },
-    "tiny_imagenet": {
-        "default_img_size": 96,
-        "description":      "Tiny ImageNet — high complexity, global reasoning",
-        "classes":          200,
-        "train_size":       "100K",
-        "complexity":       "HIGH (diverse objects, global structure)",
-    },
 }
 
 
@@ -330,10 +266,9 @@ def get_loaders(dataset: str, data_path: str, img_size: int = None,
         img_size = DATASET_INFO[dataset]["default_img_size"]
 
     loaders = {
-        "dtd":           load_dtd,
-        "stl10":         load_stl10,
-        "cifar100":      load_cifar100,
-        "tiny_imagenet": load_tiny_imagenet,
+        "dtd":      load_dtd,
+        "stl10":    load_stl10,
+        "cifar100": load_cifar100,
     }
 
     return loaders[dataset](data_path, img_size, batch_size, num_workers,

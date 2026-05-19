@@ -1,0 +1,56 @@
+{
+  "model": "cnn_mlp",
+  "model_name": "CNN + MLP",
+  "dataset": "cifar100",
+  "n_pool": 4,
+  "seq_len": 36,
+  "d_model": 64,
+  "n_blocks": 2,
+  "seeds": [
+    0,
+    42,
+    99
+  ],
+  "mean_acc": 50.4267,
+  "std_acc": 0.1473,
+  "best_acc": 50.6,
+  "params_total": 81732,
+  "params_seq": 66432,
+  "size_kb": 319.27,
+  "timestamp": "2026-04-13T02:44:12.155921",
+  "per_seed": [
+    {
+      "seed": 0,
+      "test_acc": 50.44,
+      "test_loss": 2.178913,
+      "best_val_loss": 2.176045,
+      "params_total": 81732,
+      "params_seq": 66432,
+      "size_kb": 319.27,
+      "seq_len": 36,
+      "ckpt": "outputs/cifar100/cnn_mlp_np4/best_seed0.pth"
+    },
+    {
+      "seed": 42,
+      "test_acc": 50.24,
+      "test_loss": 2.189166,
+      "best_val_loss": 2.199855,
+      "params_total": 81732,
+      "params_seq": 66432,
+      "size_kb": 319.27,
+      "seq_len": 36,
+      "ckpt": "outputs/cifar100/cnn_mlp_np4/best_seed42.pth"
+    },
+    {
+      "seed": 99,
+      "test_acc": 50.6,
+      "test_loss": 2.16579,
+      "best_val_loss": 2.155982,
+      "params_total": 81732,
+      "params_seq": 66432,
+      "size_kb": 319.27,
+      "seq_len": 36,
+      "ckpt": "outputs/cifar100/cnn_mlp_np4/best_seed99.pth"
+    }
+  ]
+}

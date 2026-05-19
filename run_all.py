@@ -5,9 +5,9 @@ For a given dataset, trains all 5 model variants × all n_pool values × all see
 Aggregates results into a publication-ready table.
 
 Datasets (ordered by task complexity):
-  dtd           — Describable Textures (local texture, auto-download)
-  stl10         — STL-10 (mixed object recognition, auto-download)
-  tiny_imagenet — Tiny ImageNet (global complexity, manual download)
+  dtd      — Describable Textures (local texture, auto-download)
+  stl10    — STL-10 (mixed object recognition, auto-download)
+  cifar100 — CIFAR-100 (100-class, auto-download)
 
 All three share image size 96×96 → identical sequence lengths:
   n_pool=4  →  L=36    (6×6  spatial tokens)
@@ -21,8 +21,8 @@ Usage:
     # STL-10 — mixed (auto-downloads)
     python run_all.py --dataset stl10 --data_path ./data
 
-    # Tiny ImageNet — complex (manual download required)
-    python run_all.py --dataset tiny_imagenet --data_path /path/to/tiny-imagenet-200
+    # CIFAR-100 — complex (auto-downloads)
+    python run_all.py --dataset cifar100 --data_path ./data
 
     # Custom config
     python run_all.py --dataset stl10 --data_path ./data \
@@ -277,7 +277,7 @@ def parse_ablation_args():
 
     # Required
     p.add_argument("--dataset",   required=True,
-                   choices=["dtd","stl10","cifar100","tiny_imagenet"])
+                   choices=["dtd","stl10","cifar100"])
     p.add_argument("--models",    nargs="+", default=ALL_MODELS,
                    choices=ALL_MODELS,
                    help="Model variants to train (default: all 5). "

@@ -1,0 +1,56 @@
+{
+  "model": "cnn_mlp",
+  "model_name": "CNN + MLP",
+  "dataset": "tiny_imagenet",
+  "n_pool": 4,
+  "seq_len": 36,
+  "d_model": 64,
+  "n_blocks": 2,
+  "seeds": [
+    0,
+    42,
+    99
+  ],
+  "mean_acc": 38.4,
+  "std_acc": 0.2211,
+  "best_acc": 38.71,
+  "params_total": 88232,
+  "params_seq": 66432,
+  "size_kb": 344.66,
+  "timestamp": "2026-03-31T10:15:38.078159",
+  "per_seed": [
+    {
+      "seed": 0,
+      "test_acc": 38.71,
+      "test_loss": 2.890718,
+      "best_val_loss": 2.890718,
+      "params_total": 88232,
+      "params_seq": 66432,
+      "size_kb": 344.66,
+      "seq_len": 36,
+      "ckpt": "outputs/tiny_imagenet/cnn_mlp_np4/best_seed0.pth"
+    },
+    {
+      "seed": 42,
+      "test_acc": 38.28,
+      "test_loss": 2.916086,
+      "best_val_loss": 2.916086,
+      "params_total": 88232,
+      "params_seq": 66432,
+      "size_kb": 344.66,
+      "seq_len": 36,
+      "ckpt": "outputs/tiny_imagenet/cnn_mlp_np4/best_seed42.pth"
+    },
+    {
+      "seed": 99,
+      "test_acc": 38.21,
+      "test_loss": 2.910431,
+      "best_val_loss": 2.910431,
+      "params_total": 88232,
+      "params_seq": 66432,
+      "size_kb": 344.66,
+      "seq_len": 36,
+      "ckpt": "outputs/tiny_imagenet/cnn_mlp_np4/best_seed99.pth"
+    }
+  ]
+}

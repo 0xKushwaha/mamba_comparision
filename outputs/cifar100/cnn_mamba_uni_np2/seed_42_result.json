@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "test_acc": 56.14,
+  "test_loss": 1.97094,
+  "best_val_loss": 1.9758,
+  "params_total": 77668,
+  "params_seq": 67584,
+  "size_kb": 303.39,
+  "seq_len": 576,
+  "ckpt": "../outputs/cifar100/cnn_mamba_uni_np2/best_seed42.pth"
+}

@@ -1,0 +1,56 @@
+{
+  "model": "cnn_mamba_bi",
+  "model_name": "CNN + Mamba (Bi)",
+  "dataset": "cifar100",
+  "n_pool": 3,
+  "seq_len": 144,
+  "d_model": 64,
+  "n_blocks": 2,
+  "seeds": [
+    0,
+    42,
+    99
+  ],
+  "mean_acc": 53.4667,
+  "std_acc": 0.389,
+  "best_acc": 53.84,
+  "params_total": 77956,
+  "params_seq": 67584,
+  "size_kb": 304.52,
+  "timestamp": "2026-04-14T21:49:10.859292",
+  "per_seed": [
+    {
+      "seed": 0,
+      "test_acc": 52.93,
+      "test_loss": 2.042515,
+      "best_val_loss": 2.06052,
+      "params_total": 77956,
+      "params_seq": 67584,
+      "size_kb": 304.52,
+      "seq_len": 144,
+      "ckpt": "outputs/cifar100/cnn_mamba_bi_np3/best_seed0.pth"
+    },
+    {
+      "seed": 42,
+      "test_acc": 53.84,
+      "test_loss": 2.009389,
+      "best_val_loss": 2.00021,
+      "params_total": 77956,
+      "params_seq": 67584,
+      "size_kb": 304.52,
+      "seq_len": 144,
+      "ckpt": "outputs/cifar100/cnn_mamba_bi_np3/best_seed42.pth"
+    },
+    {
+      "seed": 99,
+      "test_acc": 53.63,
+      "test_loss": 2.043764,
+      "best_val_loss": 2.039373,
+      "params_total": 77956,
+      "params_seq": 67584,
+      "size_kb": 304.52,
+      "seq_len": 144,
+      "ckpt": "outputs/cifar100/cnn_mamba_bi_np3/best_seed99.pth"
+    }
+  ]
+}

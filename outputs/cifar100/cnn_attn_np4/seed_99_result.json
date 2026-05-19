@@ -1,0 +1,11 @@
+{
+  "seed": 99,
+  "test_acc": 59.01,
+  "test_loss": 1.79585,
+  "best_val_loss": 1.800112,
+  "params_total": 115268,
+  "params_seq": 99968,
+  "size_kb": 450.27,
+  "seq_len": 36,
+  "ckpt": "../outputs/cifar100/cnn_attn_np4/best_seed99.pth"
+}

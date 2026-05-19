@@ -64,8 +64,7 @@ def seed_everything(seed: int):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark     = False
+    torch.backends.cudnn.benchmark = True
 
 
 # ============================================================
@@ -327,7 +326,7 @@ def parse_args():
                    choices=["pure_cnn","cnn_mlp","cnn_mamba_uni","cnn_mamba_bi","cnn_attn"],
                    help="Model variant")
     p.add_argument("--dataset",    required=True,
-                   choices=["dtd","stl10","cifar100","tiny_imagenet"],
+                   choices=["dtd","stl10","cifar100"],
                    help="Dataset to train on")
     _default_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     p.add_argument("--data_path",  default=_default_data,

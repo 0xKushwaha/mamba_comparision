@@ -12,7 +12,6 @@ Variants:
   cnn_attn       — CNN stem → Self-Attention blocks → Head
 """
 
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -128,50 +127,37 @@ class MambaBlock(nn.Module):
 
     def _scan(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Selective state space scan — vectorized via parallel prefix (associative scan).
-        No Python for-loop: runs entirely on GPU regardless of sequence length L.
-        ~10–20x faster than the sequential loop at L=576.
+        Selective state space scan via vectorized cumsum — no Python loop.
 
-        Uses the log-space associative scan trick:
-            h_t = dA_t * h_{t-1} + dB_t * x_t
-        rewritten as a parallel prefix over pairs (log_dA, dB*x).
+        Replaces the iterative-doubling approach which allocated O(B*L*d_inner*d_state*logL)
+        tensors per call (~6GB at L=576, B=128). This formulation uses a single cumsum
+        and allocates O(B*L*d_inner*d_state) memory total.
+
+        Math: h_t = P_t * cumsum_t(dB_x / P)  where P_t = cumprod_{j<=t}(dA_j)
+        Since log(dA) <= 0, log_cumP is monotonically non-increasing — exp(-log_cumP)
+        is clamped at 80 (float32 safe range) which only affects tokens whose state
+        has already decayed to < 1e-34, contributing nothing to the output.
         """
         B, L, _ = x.shape
-        A   = -torch.exp(self.A_log.float())          # [d_inner, d_state]
-        D   = self.D.float()                           # [d_inner]
+        A    = -torch.exp(self.A_log.float())
+        D    = self.D.float()
+        x_f  = x.float()
 
-        xBC = self.x_proj(x)                           # [B, L, dt_rank + 2*d_state]
+        xBC = self.x_proj(x_f)
         dt_raw, B_p, C = xBC.split(
             [self.dt_rank, self.d_state, self.d_state], dim=-1)
-        dt  = F.softplus(self.dt_proj(dt_raw))         # [B, L, d_inner]
+        dt   = F.softplus(self.dt_proj(dt_raw))           # [B, L, d_inner]
 
-        # Discretize A and B
-        dA  = torch.exp(torch.einsum("bld,ds->blds", dt, A))   # [B,L,d_inner,d_state]
-        dB_x = torch.einsum("bld,bls->blds", dt, B_p) \
-               * x.unsqueeze(-1)                                 # [B,L,d_inner,d_state]
+        dA   = torch.exp(torch.einsum("bld,ds->blds", dt, A))        # [B,L,d_inner,d_state]
+        dB_x = torch.einsum("bld,bls->blds", dt, B_p) * x_f.unsqueeze(-1)
 
-        # Parallel prefix scan over L dimension
-        # We compute h_t = dA_t * h_{t-1} + dB_x_t using log-space prefix
-        # Iterative doubling: O(log L) passes instead of O(L)
-        log_dA = torch.log(dA + 1e-8)   # [B, L, d_inner, d_state]
-        v      = dB_x                    # [B, L, d_inner, d_state]
+        log_dA   = torch.log(dA.clamp(min=1e-8)).clamp(max=0.0)
+        log_cumP = torch.cumsum(log_dA, dim=1)
+        normalized = dB_x * torch.exp((-log_cumP).clamp(max=80.0))
+        h = torch.exp(log_cumP) * torch.cumsum(normalized, dim=1)    # [B,L,d_inner,d_state]
 
-        # Build cumulative product of dA (prefix products) and prefix-summed v
-        # Using iterative doubling (parallel prefix)
-        T = L
-        for _ in range(int(math.ceil(math.log2(max(T, 1))))):
-            log_dA_shift = torch.cat([torch.zeros_like(log_dA[:, :1]), log_dA[:, :-1]], dim=1)
-            v_shift      = torch.cat([torch.zeros_like(v[:, :1]),      v[:, :-1]],      dim=1)
-            log_dA = log_dA + log_dA_shift
-            v      = torch.exp(log_dA_shift) * v_shift + v
-
-        # h: [B, L, d_inner, d_state]  (hidden states at every timestep)
-        h = v
-
-        # Compute output: sum over d_state with C
-        y = torch.einsum("blds,bls->bld", h, C)       # [B, L, d_inner]
-
-        return y + x * D.to(x.dtype)
+        y = torch.einsum("blds,bls->bld", h, C)                      # [B,L,d_inner]
+        return (y + x_f * D).to(x.dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x

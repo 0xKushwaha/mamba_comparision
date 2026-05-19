@@ -1,0 +1,56 @@
+{
+  "model": "cnn_mlp",
+  "model_name": "CNN + MLP",
+  "dataset": "dtd",
+  "n_pool": 3,
+  "seq_len": 144,
+  "d_model": 32,
+  "n_blocks": 2,
+  "seeds": [
+    0,
+    42,
+    99
+  ],
+  "mean_acc": 25.3901,
+  "std_acc": 0.5499,
+  "best_acc": 26.117,
+  "params_total": 21103,
+  "params_seq": 16832,
+  "size_kb": 82.43,
+  "timestamp": "2026-03-30T23:01:11.116062",
+  "per_seed": [
+    {
+      "seed": 0,
+      "test_acc": 26.117,
+      "test_loss": 3.026475,
+      "best_val_loss": 3.026706,
+      "params_total": 21103,
+      "params_seq": 16832,
+      "size_kb": 82.43,
+      "seq_len": 144,
+      "ckpt": "outputs/dtd/cnn_mlp_np3/best_seed0.pth"
+    },
+    {
+      "seed": 42,
+      "test_acc": 25.266,
+      "test_loss": 3.032967,
+      "best_val_loss": 3.044595,
+      "params_total": 21103,
+      "params_seq": 16832,
+      "size_kb": 82.43,
+      "seq_len": 144,
+      "ckpt": "outputs/dtd/cnn_mlp_np3/best_seed42.pth"
+    },
+    {
+      "seed": 99,
+      "test_acc": 24.7872,
+      "test_loss": 3.056242,
+      "best_val_loss": 3.028316,
+      "params_total": 21103,
+      "params_seq": 16832,
+      "size_kb": 82.43,
+      "seq_len": 144,
+      "ckpt": "outputs/dtd/cnn_mlp_np3/best_seed99.pth"
+    }
+  ]
+}

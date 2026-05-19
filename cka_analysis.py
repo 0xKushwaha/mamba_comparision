@@ -273,7 +273,7 @@ def load_trained_models(ckpt_dir: str, n_pool: int, d_model: int,
 def parse_args():
     p = argparse.ArgumentParser(description="CKA feature similarity analysis")
     p.add_argument("--dataset",    required=True,
-                   choices=["rice","cifar100","tiny_imagenet"])
+                   choices=["dtd","stl10","cifar100"])
     p.add_argument("--data_path",  required=True)
     p.add_argument("--ckpt_dir",   required=True,
                    help="e.g. outputs/rice")
