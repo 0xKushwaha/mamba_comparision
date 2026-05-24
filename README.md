@@ -85,7 +85,6 @@ mamba_cnn/
 ├── train_timeseries.py  — Time-series experiment (UCI HAR)
 ├── train_audio.py       — Audio experiment (Speech Commands v2)
 ├── download_data.py     — Utility for pre-downloading datasets
-├── cka_analysis.py      — CKA similarity analysis between model variants
 └── outputs/             — Per-run checkpoints and summary JSON files
 ```
 
